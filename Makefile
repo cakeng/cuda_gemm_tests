@@ -1,8 +1,10 @@
 TARGET=main
 OBJECTS=util.o mat_mul.o main.o
 
-CXXFLAGS=-O3 -Wall -fopenmp 
-LDFLAGS=-lm -L/usr/local/cuda/lib64 -lcudart
+CXX=g++
+CXXFLAGS=-O3 -Wall -fopenmp
+LDFLAGS=-lm -L/usr/local/cuda/lib64 -lcudart -lcuda
+COMMON=-I/usr/local/cuda/include/
 
 ARCH= -gencode arch=compute_60,code=[sm_60,compute_60] \
       -gencode arch=compute_61,code=[sm_61,compute_61] \
@@ -13,7 +15,10 @@ ARCH= -gencode arch=compute_60,code=[sm_60,compute_60] \
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJECTS) $(LDFLAGS)
+	$(CXX) $(COMMON) $(CXXFLAGS) -o $(TARGET) $(OBJECTS) $(LDFLAGS) 
+
+%.o: %.cpp
+	$(CXX) $(COMMON) $(CXXFLAGS) -c $< -o $@
 
 mat_mul.o: mat_mul.cu
 	nvcc $(ARCH) -c -o $@ $^
@@ -21,5 +26,3 @@ mat_mul.o: mat_mul.cu
 clean:
 	rm -rf $(TARGET) $(OBJECTS)
 
-run: $(TARGET)
-	sbatch run.sh

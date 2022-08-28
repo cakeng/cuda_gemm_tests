@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include <sys/time.h>
+#include <cuda_runtime.h>
 
 static double start_time[8];
 
@@ -91,7 +92,7 @@ void print_mat(float *m, int R, int C)
 
 void alloc_mat(float **m, int R, int C)
 {
-    *m = (float *)malloc(sizeof(float) * R * C);
+    cudaMallocHost (m, sizeof(float) * R * C);
     if (*m == NULL)
     {
         printf("Failed to allocate memory for matrix.\n");

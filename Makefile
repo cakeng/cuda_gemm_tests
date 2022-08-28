@@ -1,7 +1,7 @@
 TARGET=main
 OBJECTS=util.o mat_mul.o main.o
 
-CXXFLAGS=-O3 -Wall
+CXXFLAGS=-O3 -Wall -fopenmp 
 LDFLAGS=-lm -L/usr/local/cuda/lib64 -lcudart
 
 ARCH= -gencode arch=compute_60,code=[sm_60,compute_60] \
@@ -13,7 +13,7 @@ ARCH= -gencode arch=compute_60,code=[sm_60,compute_60] \
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
-	$(CXX) $(CFLAGS) -o $(TARGET) $(OBJECTS) $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJECTS) $(LDFLAGS)
 
 mat_mul.o: mat_mul.cu
 	nvcc $(ARCH) -c -o $@ $^

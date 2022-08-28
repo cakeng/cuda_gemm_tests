@@ -3,13 +3,11 @@
 #include <cuda_runtime.h>
 #include <cstdio>
 
-//#define __NOMEM 1
-//#define __NOCALC 1
 #define __NOPRINT 1
 #define __TILE_SIZE_K 8
 #define __TILE_SIZE_M 128
 #define __TILE_SIZE_N 128
-#define __VEC_SIZE_M 16
+#define __VEC_SIZE_M 8
 #define __VEC_SIZE_N 8
 
 #define __THREAD_NUM_M (__TILE_SIZE_M / __VEC_SIZE_M) 
@@ -22,7 +20,7 @@ int num_devices = 0;
 
 static float *a_d[__MAX_GPU_NUM], *b_d[__MAX_GPU_NUM], *c_d[__MAX_GPU_NUM];
 
-__global__ void sgemm_fast(const float *A, const float *B, float *C, const int M, const int N, const int K)
+__global__ void sgemm(const float *A, const float *B, float *C, const int M, const int N, const int K)
 {
     const int mLocal = threadIdx.x*__VEC_SIZE_M;
     const int nLocal = threadIdx.y*__VEC_SIZE_N; 
@@ -117,7 +115,8 @@ __global__ void sgemm_fast(const float *A, const float *B, float *C, const int M
     {
         for (int vecN = 0; vecN < __VEC_SIZE_N; vecN++)
         {
-            C[N*(m + vecM) + (n + vecN)] = cout[vecM][vecN];
+            if (m + vecM < M &&  n + vecN < N)
+                C[N*(m + vecM) + (n + vecN)] = cout[vecM][vecN];
         }   
     }
 
@@ -135,15 +134,16 @@ void mat_mul(float *A, float *B, float *C, int M, int N, int K)
     {
         cudaSetDevice(i);
         dim3 blockDim (__THREAD_NUM_M, __THREAD_NUM_N, 1);
-        dim3 gridDim (M/__TILE_SIZE_M, N/__TILE_SIZE_N, 1);
-        sgemm_fast<<<gridDim, blockDim>>>(a_d[i], b_d[i], c_d[i], M, N, K);
+        dim3 gridDim (M/__TILE_SIZE_M + ((M%__TILE_SIZE_M) > 0)
+            , N/__TILE_SIZE_N + ((N%__TILE_SIZE_N) > 0), 1);
+        sgemm<<<gridDim, blockDim>>>(a_d[i], b_d[i], c_d[i], M, N, K);
     }
     for (int i = 0; i < num_devices; i++)
     {
         cudaSetDevice(i);
         cudaMemcpyAsync(C, c_d[i], M * N * sizeof(float), cudaMemcpyDeviceToHost);
     }
-    // DO NOT REMOVE; NEEDED FOR TIME MEASURE
+
     cudaDeviceSynchronize();
 }
 
@@ -151,6 +151,7 @@ void mat_mul_init(float *A, float *B, float *C, int M, int N, int K)
 {
     printf ("Block Settings: M: %d, N: %d, K: %d, VecM: %d, VecN: %d, Thread Num: %d, ACache: %d, BCache: %d\n",
         __TILE_SIZE_M, __TILE_SIZE_N, __TILE_SIZE_K, __VEC_SIZE_M, __VEC_SIZE_N, __THREAD_NUM_M*__THREAD_NUM_N, __TILE_SIZE_M*__TILE_SIZE_K, __TILE_SIZE_N*__TILE_SIZE_K);
+    printf ("Num blocks: %d\n", (M/__TILE_SIZE_M)*(N/__TILE_SIZE_N));
     if (!((((__TILE_SIZE_K)*__TILE_SIZE_M)%__THREAD_NUM) == 0 && (((__TILE_SIZE_K)*__TILE_SIZE_N)%__THREAD_NUM) == 0))
         exit(0);
     cudaGetDeviceCount(&num_devices);
@@ -160,8 +161,6 @@ void mat_mul_init(float *A, float *B, float *C, int M, int N, int K)
     {
         cudaDeviceProp prop;
         cudaGetDeviceProperties(&prop, i);
-
-        // Try printing more detailed information here
         printf("[GPU %d] %s\n", i, prop.name);
     }
 
@@ -171,19 +170,12 @@ void mat_mul_init(float *A, float *B, float *C, int M, int N, int K)
         exit(1);
     }
 
-    // FIXME: Use only GPU 0 for default
     for (int i = 0; i < num_devices; i++)
     {
         cudaSetDevice(i);
-        // Allocate device memory
-        cudaMalloc(&a_d[i], M * (K+__TILE_SIZE_K) * sizeof(float));
-        cudaMalloc(&b_d[i], (K+__TILE_SIZE_K) * N * sizeof(float));
+        cudaMalloc(&a_d[i], (M+__TILE_SIZE_M) * (K+__TILE_SIZE_K) * sizeof(float));
+        cudaMalloc(&b_d[i], (K+__TILE_SIZE_K) * (N+__TILE_SIZE_N) * sizeof(float));
         cudaMalloc(&c_d[i], M * N * sizeof(float));
         cudaDeviceSynchronize();
     }
-}
-
-void mat_mul_final(float *A, float *B, float *C, int M, int N, int K)
-{
-    // Do any post-matmul cleanup work here.
 }

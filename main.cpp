@@ -97,7 +97,6 @@ int main(int argc, char **argv) {
   }
 
   if (validation) {
-    mat_mul_final(A, B, C, M, N, K);
     check_mat_mul(A, B, C, M, N, K);
   }
 

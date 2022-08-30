@@ -1,5 +1,5 @@
 #include "util.h"
-
+#include "mat_mul.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +9,51 @@
 #include <cuda_runtime.h>
 
 static double start_time[8];
+
+float* mat_to_filter(float *input, int h, int w)
+{
+    float *output;
+    cudaMallocHost (&output, (h + (_OUTC_CHUNK - (h%_OUTC_CHUNK)))*w*sizeof(float));
+    for (int hi = 0; hi < h; hi++)
+    {
+        for (int wi = 0; wi < w; wi++)
+        {
+            const float val = *(input + hi*w + wi);
+            *(output + ((hi/_OUTC_CHUNK)*w + wi)*_OUTC_CHUNK + (hi%_OUTC_CHUNK)) = val;
+        }
+    }
+    return output;
+}
+
+float* mat_row_to_col(float *input, int h, int w)
+{
+    float *output;
+    cudaMallocHost (&output, h*w*sizeof(float));
+    for (int hi = 0; hi < h; hi++)
+    {
+        for (int wi = 0; wi < w; wi++)
+        {
+            const float val = *(input + hi*w + wi);
+            *(output + wi*h + hi) = val;
+        }
+    }
+    return output;
+}
+
+float* mat_col_to_row(float *input, int h, int w)
+{
+    float *output;
+    cudaMallocHost (&output, h*w*sizeof(float));
+    for (int hi = 0; hi < h; hi++)
+    {
+        for (int wi = 0; wi < w; wi++)
+        {
+            const float val = *(input + wi*h + hi);
+            *(output + hi*w + wi) = val;
+        }
+    }
+    return output;
+}
 
 static double get_time()
 {
@@ -98,6 +143,7 @@ void alloc_mat(float **m, int R, int C)
         printf("Failed to allocate memory for matrix.\n");
         exit(0);
     }
+    zero_mat (*m, R, C);
 }
 
 void rand_mat(float *m, int R, int C)
@@ -107,6 +153,17 @@ void rand_mat(float *m, int R, int C)
         for (int j = 0; j < C; j++)
         {
             m[i * C + j] = (float)rand() / RAND_MAX - 0.5;
+        }
+    }
+}
+
+void set_mat(float *m, int R, int C, float val)
+{
+    for (int i = 0; i < R; i++)
+    {
+        for (int j = 0; j < C; j++)
+        {
+            m[i * C + j] = val;
         }
     }
 }

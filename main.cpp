@@ -62,17 +62,21 @@ int main(int argc, char **argv) {
   parse_opt(argc, argv);
 
   printf("Initializing matrix... "); fflush(stdout);
-  float *A, *B, *C;
+  float *A, *A_new, *B, *B_new, *C, *C_new;
   alloc_mat(&A, M, K);
   alloc_mat(&B, K, N);
   alloc_mat(&C, M, N);
   rand_mat(A, M, K);
   rand_mat(B, K, N);
+  // set_mat(A, M, K, 1.0f);
+  // set_mat(B, K, N, 1.0f);
+  A[0] = 2.0f;
   printf("done!\n");
 
   printf("Initializing CUDA...\n"); fflush(stdout);
   mat_mul_init(A, B, C, M, N, K);
-
+  A_new = mat_to_filter (A, M, K);
+  B_new = mat_row_to_col (B, K, N);
   double elapsed_time_sum = 0;
   for (int i = -3; i < num_iterations; ++i) {
     if (i < 0) {
@@ -81,7 +85,7 @@ int main(int argc, char **argv) {
       printf("Calculating...(iter=%d) ", i); fflush(stdout);
     }
     timer_start(0);
-    mat_mul(A, B, C, M, N, K);
+    mat_mul(A_new, B_new, C, M, N, K);
     double elapsed_time = timer_stop(0);
     printf("%f sec\n", elapsed_time);
     if (i < 0) {
@@ -89,20 +93,22 @@ int main(int argc, char **argv) {
       elapsed_time_sum += elapsed_time;
     }
   }
-
+  C_new = mat_col_to_row (C, M, N);
   if (print_matrix) {
     printf("MATRIX A:\n"); print_mat(A, M, K);
+    printf("MATRIX A_new:\n"); print_mat(A_new, M, K);
     printf("MATRIX B:\n"); print_mat(B, K, N);
+    printf("MATRIX B_new:\n"); print_mat(B_new, K, N);
     printf("MATRIX C:\n"); print_mat(C, M, N);
-  }
-
-  if (validation) {
-    check_mat_mul(A, B, C, M, N, K);
+    printf("MATRIX C_new:\n"); print_mat(C_new, M, N);
   }
 
   double elapsed_time_avg = elapsed_time_sum / num_iterations;
   printf("Avg. time: %f sec\n", elapsed_time_avg);
   printf("Avg. throughput: %f GFLOPS\n", 2.0 * M * N * K / elapsed_time_avg / 1e9);
+
+  if (validation)
+    check_mat_mul(A, B, C_new, M, N, K);
 
   return 0;
 }

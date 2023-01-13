@@ -122,7 +122,7 @@ __global__ void sgemm(const float *A, const float *B, float *C, const int M, con
     }
 }
 
-void mat_mul(float *A, float *B, float *C, int M, int N, int K)
+void mat_mul_write_to_gpu(float *A, float *B, float *C, int M, int N, int K)
 {
     for (int i = 0; i < num_devices; i++)
     {
@@ -130,6 +130,23 @@ void mat_mul(float *A, float *B, float *C, int M, int N, int K)
         cudaMemcpyAsync(a_d[i], A, (M + (_OUTC_CHUNK - (M%_OUTC_CHUNK))) * K * sizeof(float), cudaMemcpyHostToDevice);
         cudaMemcpyAsync(b_d[i], B, K * N * sizeof(float), cudaMemcpyHostToDevice);
     }
+}
+
+void mat_mul_read_from_gpu(float *A, float *B, float *C, int M, int N, int K)
+{
+    for (int i = 0; i < num_devices; i++)
+    {
+        cudaSetDevice(i);
+        cudaMemcpyAsync(C, c_d[i], M * N * sizeof(float), cudaMemcpyDeviceToHost);
+    }
+    cudaDeviceSynchronize();
+}
+
+void mat_mul(float *A, float *B, float *C, int M, int N, int K, int skip_data_movement)
+{
+    if (!skip_data_movement)
+        mat_mul_write_to_gpu (A, B, C, M, N, K);
+    
     for (int i = 0; i < num_devices; i++)
     {
         cudaSetDevice(i);
@@ -137,13 +154,9 @@ void mat_mul(float *A, float *B, float *C, int M, int N, int K)
         dim3 blockDim ((_BLOCK_M_SIZE / _THREAD_M_SIZE), (_BLOCK_N_SIZE / _THREAD_N_SIZE), 1);
         sgemm<<<gridDim, blockDim>>>(a_d[i], b_d[i], c_d[i], M, N, K);
     }
-    for (int i = 0; i < num_devices; i++)
-    {
-        cudaSetDevice(i);
-        cudaMemcpyAsync(C, c_d[i], M * N * sizeof(float), cudaMemcpyDeviceToHost);
-    }
-
-    cudaDeviceSynchronize();
+    
+    if (!skip_data_movement)
+        mat_mul_read_from_gpu (A, B, C, M, N, K);
 }
 
 void mat_mul_init(float *A, float *B, float *C, int M, int N, int K)

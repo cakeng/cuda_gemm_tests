@@ -20,12 +20,13 @@ static void print_help(const char* prog_name) {
 
 static bool print_matrix = false;
 static bool validation = false;
+static bool skip_data_movement = false;
 static int M = 8, N = 8, K = 8;
 static int num_iterations = 1;
 
 static void parse_opt(int argc, char **argv) {
   int c;
-  while ((c = getopt(argc, argv, "pvht:n:")) != -1) {
+  while ((c = getopt(argc, argv, "pvhst:n:")) != -1) {
     switch (c) {
       case 'p':
         print_matrix = true;
@@ -35,6 +36,9 @@ static void parse_opt(int argc, char **argv) {
         break;
       case 'n':
         num_iterations = atoi(optarg);
+        break;
+      case 's':
+        skip_data_movement = true;
         break;
       case 'h':
       default:
@@ -53,6 +57,7 @@ static void parse_opt(int argc, char **argv) {
   printf("Options:\n");
   printf("  Problem size: M = %d, N = %d, K = %d\n", M, N, K);
   printf("  Number of iterations: %d\n", num_iterations);
+  printf("  Skip data movement: %s\n", skip_data_movement ? "on" : "off");
   printf("  Print matrix: %s\n", print_matrix ? "on" : "off");
   printf("  Validation: %s\n", validation ? "on" : "off");
   printf("\n");
@@ -84,9 +89,13 @@ int main(int argc, char **argv) {
     } else {
       printf("Calculating...(iter=%d) ", i); fflush(stdout);
     }
+    if (skip_data_movement) 
+      mat_mul_write_to_gpu (A_new, B_new, C, M, N, K);
     timer_start(0);
-    mat_mul(A_new, B_new, C, M, N, K);
+    mat_mul(A_new, B_new, C, M, N, K, skip_data_movement);
     double elapsed_time = timer_stop(0);
+    if (skip_data_movement)
+      mat_mul_read_from_gpu (A_new, B_new, C, M, N, K);
     printf("%f sec\n", elapsed_time);
     if (i < 0) {
     } else {
@@ -104,6 +113,42 @@ int main(int argc, char **argv) {
   }
 
   double elapsed_time_avg = elapsed_time_sum / num_iterations;
+  printf("Avg. time: %f sec\n", elapsed_time_avg);
+  printf("Avg. throughput: %f GFLOPS\n", 2.0 * M * N * K / elapsed_time_avg / 1e9);
+
+  if (validation)
+    check_mat_mul(A, B, C_new, M, N, K);
+
+  printf("Initializing cuBLAS...\n"); fflush(stdout);
+  cublas_mat_mul_init(A, B, C, M, N, K);
+  elapsed_time_sum = 0;
+  for (int i = -3; i < num_iterations; ++i) {
+    if (i < 0) {
+      printf("Warming up GPU..."); fflush(stdout);
+    } else {
+      printf("Calculating...(iter=%d) ", i); fflush(stdout);
+    }
+    if (skip_data_movement) 
+      cublas_mat_mul_write_to_gpu (A, B, C, M, N, K);
+    timer_start(0);
+    cublas_mat_mul(A, B, C, M, N, K, skip_data_movement);
+    double elapsed_time = timer_stop(0);
+    if (skip_data_movement)
+      cublas_mat_mul_read_from_gpu (A, B, C, M, N, K);
+    printf("%f sec\n", elapsed_time);
+    if (i < 0) {
+    } else {
+      elapsed_time_sum += elapsed_time;
+    }
+  }
+  C_new = mat_col_to_row (C, M, N);
+  if (print_matrix) {
+    printf("MATRIX A:\n"); print_mat(A, M, K);
+    printf("MATRIX B:\n"); print_mat(B, K, N);
+    printf("MATRIX C:\n"); print_mat(C, M, N);
+  }
+
+  elapsed_time_avg = elapsed_time_sum / num_iterations;
   printf("Avg. time: %f sec\n", elapsed_time_avg);
   printf("Avg. throughput: %f GFLOPS\n", 2.0 * M * N * K / elapsed_time_avg / 1e9);
 

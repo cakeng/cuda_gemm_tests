@@ -1,9 +1,9 @@
 TARGET=main
-OBJECTS=util.o mat_mul.o main.o
+OBJECTS=util.o mat_mul.o cublas_mat_mul.o main.o
 
 CXX=g++
 CXXFLAGS=-O3 -Wall -fopenmp
-LDFLAGS=-lm -L/usr/local/cuda/lib64 -lcudart -lcuda
+LDFLAGS=-lm -L/usr/local/cuda/lib64 -lcudart -lcuda -lcublas
 COMMON=-I/usr/local/cuda/include/
 
 ARCH= -gencode arch=compute_60,code=[sm_60,compute_60] \
@@ -21,6 +21,9 @@ $(TARGET): $(OBJECTS)
 	$(CXX) $(COMMON) $(CXXFLAGS) -c $< -o $@
 
 mat_mul.o: mat_mul.cu
+	nvcc $(ARCH) -c -o $@ $^
+
+cublas_mat_mul.o: cublas_mat_mul.cu
 	nvcc $(ARCH) -c -o $@ $^
 
 clean:

@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include <cstdio>
 
-#define _BLOCK_K_SIZE 16
+#define _BLOCK_K_SIZE 8
 #define _BLOCK_M_SIZE 128
 #define _BLOCK_N_SIZE 128
 #define _THREAD_M_SIZE 8
@@ -27,6 +27,8 @@ __global__ void sgemm(const float *A, const float *B, float *C, const int M, con
     const int kRem = K%_BLOCK_K_SIZE;
     __shared__ float ACache [_BLOCK_K_SIZE*_BLOCK_M_SIZE];
     __shared__ float BCache [_BLOCK_K_SIZE*_BLOCK_N_SIZE];
+    float Areg[_THREAD_M_SIZE];
+    float Breg[_THREAD_N_SIZE];
     float cout[_THREAD_N_SIZE][_THREAD_M_SIZE];
     for (int vecN = 0; vecN < _THREAD_N_SIZE; vecN++)
     {
@@ -61,12 +63,20 @@ __global__ void sgemm(const float *A, const float *B, float *C, const int M, con
         __syncthreads();
         for (int kk = 0; kk < _BLOCK_K_SIZE; kk++)
         {
+            for (int vecN = 0; vecN < _THREAD_N_SIZE; vecN++)
+            {
+                Breg[vecN] = BCache[kk*_BLOCK_N_SIZE + nLocal + vecN];
+            }
+            for (int vecM = 0; vecM < _THREAD_M_SIZE; vecM++)
+            {
+                Areg[vecM] = ACache[kk*_BLOCK_M_SIZE + mLocal + vecM];
+            }
             // Calculate.
             for (int vecN = 0; vecN < _THREAD_N_SIZE; vecN++)
             {
                 for (int vecM = 0; vecM < _THREAD_M_SIZE; vecM++)
                 {
-                    cout[vecN][vecM] += ACache[kk*_BLOCK_M_SIZE + mLocal + vecM] * BCache[kk*_BLOCK_N_SIZE + nLocal + vecN];
+                    cout[vecN][vecM] += Areg[vecM]*Breg[vecN];
                 }   
             }
         }
@@ -130,6 +140,8 @@ void mat_mul_write_to_gpu(float *A, float *B, float *C, int M, int N, int K)
         cudaMemcpyAsync(a_d[i], A, (M + (_OUTC_CHUNK - (M%_OUTC_CHUNK))) * K * sizeof(float), cudaMemcpyHostToDevice);
         cudaMemcpyAsync(b_d[i], B, K * N * sizeof(float), cudaMemcpyHostToDevice);
     }
+
+    cudaDeviceSynchronize();
 }
 
 void mat_mul_read_from_gpu(float *A, float *B, float *C, int M, int N, int K)

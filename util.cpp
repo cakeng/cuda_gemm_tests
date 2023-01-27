@@ -72,24 +72,25 @@ double timer_stop(int i)
     return get_time() - start_time[i];
 }
 
-void check_mat_mul(float *A, float *B, float *C, int M, int N, int K)
+void calculate_mat_mul (float *A, float *B, float *C, int M, int N, int K)
 {
-    printf("Validating...\n");
-
-    float *C_ans;
-    alloc_mat(&C_ans, M, N);
-    zero_mat(C_ans, M, N);
-#pragma omp parallel for
+    printf("Calculating...\n");
+    #pragma omp parallel for
     for (int i = 0; i < M; ++i)
     {
         for (int k = 0; k < K; ++k)
         {
             for (int j = 0; j < N; ++j)
             {
-                C_ans[i * N + j] += A[i * K + k] * B[k * N + j];
+                C[i * N + j] += A[i * K + k] * B[k * N + j];
             }
         }
     }
+}
+
+void check_mat_mul(float *C_ans, float *C, int M, int N, int K)
+{
+    printf("Validating...\n");
 
     bool is_valid = true;
     int cnt = 0, thr = 10;

@@ -2,6 +2,7 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <cblas.h>
 
 #include "util.h"
 #include "mat_mul.h"
@@ -24,6 +25,12 @@ static bool validation = false;
 static bool skip_data_movement = false;
 static int M = 8, N = 8, K = 8;
 static int num_iterations = 1;
+
+void cpu_mat_mul(float *A, float *B, float *C, int M, int N, int K, int skip_data_movement)
+{
+    cblas_sgemm (CblasColMajor, CblasNoTrans, CblasNoTrans,
+        N, M, K, 1, B, N, A, K, 0, C, N);
+}
 
 static void parse_opt(int argc, char **argv)
 {
@@ -82,23 +89,62 @@ int main(int argc, char **argv)
 
     printf("Initializing matrix... ");
     fflush(stdout);
-    float *A, *A_new, *B, *B_new, *C, *C_new;
+    float *A, *B, *C, *C_ans;
     alloc_mat(&A, M, K);
     alloc_mat(&B, K, N);
     alloc_mat(&C, M, N);
+    alloc_mat(&C_ans, M, N);
     rand_mat(A, M, K);
     rand_mat(B, K, N);
-    // set_mat(A, M, K, 1.0f);
-    // set_mat(B, K, N, 1.0f);
-    A[0] = 2.0f;
+    calculate_mat_mul(A, B, C_ans, M, N, K);
+    if (print_matrix)
+    {
+        printf("MATRIX A:\n");
+        print_mat(A, M, K);
+        printf("MATRIX B:\n");
+        print_mat(B, K, N);
+        printf("MATRIX C:\n");
+        print_mat(C, M, N);
+    }
     printf("done!\n");
+
+    printf("Initializing CPU...\n");
+    fflush(stdout);
+    double elapsed_time_sum = 0;
+    for (int i = -3; i < num_iterations; ++i)
+    {
+        if (i < 0)
+        {
+            printf("Warming up CPU...");
+            fflush(stdout);
+        }
+        else
+        {
+            printf("Calculating...(iter=%d) ", i);
+            fflush(stdout);
+        }
+        timer_start(0);
+        cpu_mat_mul (A, B, C, M, N, K, skip_data_movement);
+        double elapsed_time = timer_stop(0);
+        printf("%f sec\n", elapsed_time);
+        if (i >= 0)
+        {
+            elapsed_time_sum += elapsed_time;
+        }
+    }
+
+    double elapsed_time_avg = elapsed_time_sum / num_iterations;
+    printf("Avg. time: %f sec\n", elapsed_time_avg);
+    printf("Avg. throughput: %f GFLOPS\n", 2.0 * M * N * K / elapsed_time_avg / 1e9);
+
+    if (validation)
+        check_mat_mul(C_ans, C, M, N, K);
+    rand_mat (C, M, N);
 
     printf("Initializing CUDA...\n");
     fflush(stdout);
     mat_mul_init(A, B, C, M, N, K);
-    A_new = mat_to_filter(A, M, K);
-    B_new = mat_row_to_col(B, K, N);
-    double elapsed_time_sum = 0;
+    elapsed_time_sum = 0;
     for (int i = -3; i < num_iterations; ++i)
     {
         if (i < 0)
@@ -112,44 +158,26 @@ int main(int argc, char **argv)
             fflush(stdout);
         }
         if (skip_data_movement)
-            mat_mul_write_to_gpu(A_new, B_new, C, M, N, K);
+            mat_mul_write_to_gpu(A, B, C, M, N, K);
         timer_start(0);
-        mat_mul(A_new, B_new, C, M, N, K, skip_data_movement);
+        mat_mul(A, B, C, M, N, K, skip_data_movement);
         double elapsed_time = timer_stop(0);
         if (skip_data_movement)
-            mat_mul_read_from_gpu(A_new, B_new, C, M, N, K);
+            mat_mul_read_from_gpu(A, B, C, M, N, K);
         printf("%f sec\n", elapsed_time);
-        if (i < 0)
-        {
-        }
-        else
+        if (i >= 0)
         {
             elapsed_time_sum += elapsed_time;
         }
     }
-    C_new = mat_col_to_row(C, M, N);
-    if (print_matrix)
-    {
-        printf("MATRIX A:\n");
-        print_mat(A, M, K);
-        printf("MATRIX A_new:\n");
-        print_mat(A_new, M, K);
-        printf("MATRIX B:\n");
-        print_mat(B, K, N);
-        printf("MATRIX B_new:\n");
-        print_mat(B_new, K, N);
-        printf("MATRIX C:\n");
-        print_mat(C, M, N);
-        printf("MATRIX C_new:\n");
-        print_mat(C_new, M, N);
-    }
-
-    double elapsed_time_avg = elapsed_time_sum / num_iterations;
+    
+    elapsed_time_avg = elapsed_time_sum / num_iterations;
     printf("Avg. time: %f sec\n", elapsed_time_avg);
     printf("Avg. throughput: %f GFLOPS\n", 2.0 * M * N * K / elapsed_time_avg / 1e9);
 
     if (validation)
-        check_mat_mul(A, B, C_new, M, N, K);
+        check_mat_mul(C_ans, C, M, N, K);
+    rand_mat (C, M, N);
 
     printf("Initializing cuBLAS...\n");
     fflush(stdout);
@@ -175,21 +203,13 @@ int main(int argc, char **argv)
         if (skip_data_movement)
             cublas_mat_mul_read_from_gpu(A, B, C, M, N, K);
         printf("%f sec\n", elapsed_time);
-        if (i < 0)
-        {
-        }
-        else
+        if (i >= 0)
         {
             elapsed_time_sum += elapsed_time;
         }
     }
-    C_new = mat_col_to_row(C, M, N);
     if (print_matrix)
     {
-        printf("MATRIX A:\n");
-        print_mat(A, M, K);
-        printf("MATRIX B:\n");
-        print_mat(B, K, N);
         printf("MATRIX C:\n");
         print_mat(C, M, N);
     }
@@ -199,7 +219,8 @@ int main(int argc, char **argv)
     printf("Avg. throughput: %f GFLOPS\n", 2.0 * M * N * K / elapsed_time_avg / 1e9);
 
     if (validation)
-        check_mat_mul(A, B, C, M, N, K);
+        check_mat_mul(C_ans, C, M, N, K);
+    rand_mat (C, M, N);
 
     return 0;
 }

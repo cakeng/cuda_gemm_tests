@@ -93,10 +93,13 @@ int main(int argc, char **argv)
     alloc_mat(&A, M, K);
     alloc_mat(&B, K, N);
     alloc_mat(&C, M, N);
-    alloc_mat(&C_ans, M, N);
     rand_mat(A, M, K);
     rand_mat(B, K, N);
-    calculate_mat_mul(A, B, C_ans, M, N, K);
+    if (validation)
+    {
+        alloc_mat(&C_ans, M, N);
+        calculate_mat_mul(A, B, C_ans, M, N, K);
+    }
     if (print_matrix)
     {
         printf("MATRIX A:\n");
@@ -138,8 +141,10 @@ int main(int argc, char **argv)
     printf("Avg. throughput: %f GFLOPS\n", 2.0 * M * N * K / elapsed_time_avg / 1e9);
 
     if (validation)
+    {
         check_mat_mul(C_ans, C, M, N, K);
-    rand_mat (C, M, N);
+        rand_mat (C, M, N);
+    }
 
     printf("Initializing CUDA...\n");
     fflush(stdout);
@@ -176,8 +181,10 @@ int main(int argc, char **argv)
     printf("Avg. throughput: %f GFLOPS\n", 2.0 * M * N * K / elapsed_time_avg / 1e9);
 
     if (validation)
+    {
         check_mat_mul(C_ans, C, M, N, K);
-    rand_mat (C, M, N);
+        rand_mat (C, M, N);
+    }
 
     printf("Initializing cuBLAS...\n");
     fflush(stdout);
@@ -219,8 +226,10 @@ int main(int argc, char **argv)
     printf("Avg. throughput: %f GFLOPS\n", 2.0 * M * N * K / elapsed_time_avg / 1e9);
 
     if (validation)
+    {
         check_mat_mul(C_ans, C, M, N, K);
-    rand_mat (C, M, N);
+        rand_mat (C, M, N);
+    }
 
     return 0;
 }

@@ -5,10 +5,13 @@ Base code is taken from SNU CS Multicore Processor's coursework HW6.
 
 Requires CUDA capable graphics card and CUDA toolkit.
 
-Tested on RTX 3090 with CUDA version 11.7. Reaches 11TFLOPs with M=N=K=8192.
+On RTX 3090 with CUDA version 11.7, custom kernel reaches 11TFLOPs, cuBLAS reaches 15TFLOPs with M=N=K=8192.
 
-Also tested on RTX 2070 SUPER with CUDA version 11.5. Reaches 3.5TFLOPs with M=N=K=8192.
+On RTX 3070 with CUDA version 12.0, custom kernel reaches 4.5TFLOPs, cuBLAS reaches 5.7TFLOPs with M=N=K=8192.
 
+On RTX 2070 SUPER with CUDA version 11.5, custom kernel reaches 3.5TFLOPs, cuBLAS reaches 5.9TFLOPs with M=N=K=8192.
+
+CPU results: i7-10700: 130GFLOPs(?), i7-7700K: 469GLFOPs, Threaripper-3990X: 2.1TFLOPs using OpenBLAS
 
 //// INSTRUCTIONS ////
 

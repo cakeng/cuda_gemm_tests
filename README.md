@@ -11,7 +11,7 @@ On RTX 3070 with CUDA version 12.0, custom kernel reaches 4.5TFLOPs, cuBLAS reac
 
 On RTX 2070 SUPER with CUDA version 11.5, custom kernel reaches 3.5TFLOPs, cuBLAS reaches 5.9TFLOPs with M=N=K=8192.
 
-CPU results: i7-10700: 130GFLOPs(?), i7-7700K: 469GLFOPs, Threaripper-3990X: 2.1TFLOPs using OpenBLAS
+CPU results: i7-10700: 130GFLOPs(?), i7-7700K: 469GLFOPs, Threadripper-3990X: 2.1TFLOPs using OpenBLAS
 
 //// INSTRUCTIONS ////
 

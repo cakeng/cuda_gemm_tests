@@ -3,7 +3,7 @@ Toy implementation of CUDA accelerated GEMM.
 
 Base code is taken from SNU CS Multicore Processor's coursework HW6.
 
-Requires CUDA capable graphics card and CUDA toolkit.
+Requires CUDA capable graphics card, Nvidia Drivers, CUDA Toolkit, cuBLAS, and OpenBLAS for full operation.
 
 On RTX 3090 with CUDA version 11.7, custom kernel reaches 11TFLOPs, cuBLAS reaches 15TFLOPs with M=N=K=8192.
 
